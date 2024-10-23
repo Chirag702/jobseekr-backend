@@ -26,7 +26,7 @@ public class JobController {
     }
 
 
-    @GetMapping("/api/jobs")
+    @GetMapping
      public ResponseEntity<Page<JobDTO>> getAllJobs(
             @RequestHeader(value = "Authorization") String authorizationHeader,
             @RequestParam(defaultValue = "0") int page,
