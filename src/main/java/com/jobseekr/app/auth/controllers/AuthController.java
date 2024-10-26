@@ -50,173 +50,177 @@ import com.jobseekr.app.auth.models.PasswordResetToken;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
-    PasswordResetTokenRepository tokenRepository;
+	@Autowired
+	PasswordResetTokenRepository tokenRepository;
 
-    @Autowired
-    public JwtUtils jwt;
+	@Autowired
+	public JwtUtils jwt;
 
-    @Autowired
-    AuthenticationManager authenticationManager;
+	@Autowired
+	AuthenticationManager authenticationManager;
 
-    @Autowired
-    UserRepository userRepository;
+	@Autowired
+	UserRepository userRepository;
 
-    @Autowired
-    RoleRepository roleRepository;
+	@Autowired
+	RoleRepository roleRepository;
 
-    @Autowired
-    PasswordEncoder encoder;
+	@Autowired
+	PasswordEncoder encoder;
 
-    @Autowired
-    EmailService emailService;
+	@Autowired
+	EmailService emailService;
 
-    @Autowired
-    JwtUtils jwtUtils;
+	@Autowired
+	JwtUtils jwtUtils;
 
-    @PostMapping("/signin")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
+	@PostMapping("/signin")
+	public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+		Authentication authentication = authenticationManager.authenticate(
+				new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(userDetails);
+		SecurityContextHolder.getContext().setAuthentication(authentication);
+		UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+		ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(userDetails);
 
-        List<String> roles = userDetails.getAuthorities().stream().map(item -> item.getAuthority())
-                .collect(Collectors.toList());
+		List<String> roles = userDetails.getAuthorities().stream().map(item -> item.getAuthority())
+				.collect(Collectors.toList());
 
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, jwtCookie.toString()).body(new UserInfoResponse(
-                userDetails.getId(), userDetails.getUsername(), userDetails.getEmail(), roles, jwtCookie.toString()));
-    }
+		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, jwtCookie.toString()).body(new UserInfoResponse(
+				userDetails.getId(), userDetails.getUsername(), userDetails.getEmail(), roles, jwtCookie.toString()));
+	}
 
-    public static int generateRandomNumber(int min, int max) {
-        return new Random().nextInt(max - min + 1) + min;
-    }
+	public static int generateRandomNumber(int min, int max) {
+		return new Random().nextInt(max - min + 1) + min;
+	}
 
-    @PostMapping("/signup")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) throws MessagingException {
-        if (userRepository.existsByUsername(signUpRequest.getUsername())) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error: Username is already taken!"));
-        }
+	@PostMapping("/signup")
+	public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) throws MessagingException {
+		if (userRepository.existsByUsername(signUpRequest.getUsername())) {
+			return ResponseEntity.badRequest().body(new MessageResponse("Error: Username is already taken!"));
+		}
 
-        if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error: Email is already in use!"));
-        }
+		if (userRepository.existsByEmail(signUpRequest.getEmail())) {
+			return ResponseEntity.badRequest().body(new MessageResponse("Error: Email is already in use!"));
+		}
 
-        String otp = String.valueOf(generateRandomNumber(100000, 999999));
-        User user;
+		String otp = String.valueOf(generateRandomNumber(100000, 999999));
+		User user;
 
-        if (signUpRequest.getCompanyName() == null || signUpRequest.getCompanyRole() == null) {
-            user = new User(signUpRequest.getUsername(), signUpRequest.getEmail(),
-                    encoder.encode(signUpRequest.getPassword()), otp, false);
-        } else {
-            user = new User(signUpRequest.getUsername(), signUpRequest.getEmail(),
-                    encoder.encode(signUpRequest.getPassword()), otp, false,
-                    signUpRequest.getCompanyName(), signUpRequest.getCompanyRole());
-        }
+		if (signUpRequest.getCompanyName() == null || signUpRequest.getCompanyRole() == null) {
+			user = new User(signUpRequest.getUsername(), signUpRequest.getEmail(),
+					encoder.encode(signUpRequest.getPassword()), otp, false);
+		} else {
+			user = new User(signUpRequest.getUsername(), signUpRequest.getEmail(),
+					encoder.encode(signUpRequest.getPassword()), otp, false, signUpRequest.getCompanyName(),
+					signUpRequest.getCompanyRole());
+		}
 
-        Set<String> strRoles = signUpRequest.getRole();
-        Set<Role> roles = new HashSet<>();
-        if (strRoles == null) {
-            Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                    .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-            roles.add(userRole);
-        } else {
-            strRoles.forEach(role -> {
-                switch (role) {
-                    case "admin":
-                        Role adminRole = roleRepository.findByName(ERole.ROLE_ADMIN)
-                                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                        roles.add(adminRole);
-                        break;
-                    case "mod":
-                        Role modRole = roleRepository.findByName(ERole.ROLE_MODERATOR)
-                                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                        roles.add(modRole);
-                        break;
-                    default:
-                        Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                        roles.add(userRole);
-                }
-            });
-        }
-        user.setRoles(roles);
-        userRepository.save(user);
+		Set<String> strRoles = signUpRequest.getRole();
+		Set<Role> roles = new HashSet<>();
+		if (strRoles == null) {
+			Role userRole = roleRepository.findByName(ERole.ROLE_USER)
+					.orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+			roles.add(userRole);
+		} else {
+			strRoles.forEach(role -> {
+				switch (role) {
+				case "admin":
+					Role adminRole = roleRepository.findByName(ERole.ROLE_ADMIN)
+							.orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+					roles.add(adminRole);
+					break;
+				case "mod":
+					Role modRole = roleRepository.findByName(ERole.ROLE_MODERATOR)
+							.orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+					roles.add(modRole);
+					break;
+				default:
+					Role userRole = roleRepository.findByName(ERole.ROLE_USER)
+							.orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+					roles.add(userRole);
+				}
+			});
+		}
+		user.setRoles(roles);
+		userRepository.save(user);
 
-        emailService.sendHtmlEmail(signUpRequest.getEmail(), "Email Address Validation", "<!DOCTYPE html>"
-                + "<html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>OTP Verification</title>"
-                + "<link href='https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css' rel='stylesheet'><style>"
-                + "body { background-color: #f8f9fa; } .email-container { background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); margin: 50px auto; max-width: 600px; }"
-                + ".otp { font-size: 24px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; } .btn-primary { background-color: #007bff; border-color: #007bff; text-decoration: none; color: #ffffff; padding: 10px 20px; border-radius: 5px; }"
-                + "</style></head><body><div class='container'><div class='email-container'><p>Hi JobSeekr,</p><p>Thank you for registering with JobSeekr. Please use the OTP below to verify your account:</p>"
-                + "<div class='otp text-center'>" + otp + "</div><p class='text-center'>This OTP is valid for 10 minutes.</p><p>If you did not request this code, please ignore this email.</p><br><p>Thank you,<br>JobSeekr Team</p></div></div></body></html>");
+		emailService.sendHtmlEmail(signUpRequest.getEmail(), "Email Address Validation", "<!DOCTYPE html>"
+				+ "<html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>OTP Verification</title>"
+				+ "<link href='https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css' rel='stylesheet'><style>"
+				+ "body { background-color: #f8f9fa; } .email-container { background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); margin: 50px auto; max-width: 600px; }"
+				+ ".otp { font-size: 24px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; } .btn-primary { background-color: #007bff; border-color: #007bff; text-decoration: none; color: #ffffff; padding: 10px 20px; border-radius: 5px; }"
+				+ "</style></head><body><div class='container'><div class='email-container'><p>Hi JobSeekr,</p><p>Thank you for registering with JobSeekr. Please use the OTP below to verify your account:</p>"
+				+ "<div class='otp text-center'>" + otp
+				+ "</div><p class='text-center'>This OTP is valid for 10 minutes.</p><p>If you did not request this code, please ignore this email.</p><br><p>Thank you,<br>JobSeekr Team</p></div></div></body></html>");
 
-        Authentication authentication = authenticationManager
-                .authenticate(new UsernamePasswordAuthenticationToken(user.getEmail(), signUpRequest.getPassword()));
+		Authentication authentication = authenticationManager
+				.authenticate(new UsernamePasswordAuthenticationToken(user.getEmail(), signUpRequest.getPassword()));
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(userDetails);
+		SecurityContextHolder.getContext().setAuthentication(authentication);
+		UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+		ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(userDetails);
 
-        List<String> roles2 = userDetails.getAuthorities().stream().map(item -> item.getAuthority())
-                .collect(Collectors.toList());
+		List<String> roles2 = userDetails.getAuthorities().stream().map(item -> item.getAuthority())
+				.collect(Collectors.toList());
 
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, jwtCookie.toString()).body(new UserInfoResponse(
-                userDetails.getId(), userDetails.getUsername(), userDetails.getEmail(), roles2, jwtCookie.toString()));
-    }
+		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, jwtCookie.toString()).body(new UserInfoResponse(
+				userDetails.getId(), userDetails.getUsername(), userDetails.getEmail(), roles2, jwtCookie.toString()));
+	}
 
-    @PostMapping("/signout")
-    public ResponseEntity<?> logoutUser() {
-        ResponseCookie cookie = jwtUtils.getCleanJwtCookie();
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(new MessageResponse("You've been signed out!"));
-    }
+	@PostMapping("/signout")
+	public ResponseEntity<?> logoutUser() {
+		ResponseCookie cookie = jwtUtils.getCleanJwtCookie();
+		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
+				.body(new MessageResponse("You've been signed out!"));
+	}
 
-    @PostMapping("/check/email")
-    public Boolean checkEmailExists(@RequestBody SignupRequest signupRequest) {
-        return userRepository.existsByEmail(signupRequest.getEmail());
-    }
+	@PostMapping("/check/email")
+	public Boolean checkEmailExists(@RequestBody SignupRequest signupRequest) {
+		return userRepository.existsByEmail(signupRequest.getEmail());
+	}
 
-    @PostMapping("/verify/email")
-    public Boolean verifyEmail(@RequestHeader("Authorization") String authorizationHeader, @RequestBody User user1) {
-        String token = authorizationHeader.substring(7);
-        String email = jwt.getUserNameFromJwtToken(token);
-        User user = userRepository.findByEmail(email);
+	@PostMapping("/verify/email")
+	public Boolean verifyEmail(@RequestHeader("Authorization") String authorizationHeader, @RequestBody User user1) {
+		String token = authorizationHeader.substring(7);
+		String email = jwt.getUserNameFromJwtToken(token);
+		User user = userRepository.findByEmail(email);
 
-        if (user != null && user.getOtp().equals(user1.getOtp())) {
-            user.setIsEmailVerified(true);
-            userRepository.save(user);
-            return true;
-        }
-        return false;
-    }
+		if (user != null && user.getOtp().equals(user1.getOtp())) {
+			user.setIsEmailVerified(true);
+			userRepository.save(user);
+			return true;
+		}
+		return false;
+	}
 
-    @PostMapping("/is/email/verify")
-    public Boolean isEmailVerified(@RequestHeader("Authorization") String authorizationHeader) {
-        String token = authorizationHeader.substring(7);
-        String email = jwt.getUserNameFromJwtToken(token);
-        User user = userRepository.findByEmail(email);
+	@PostMapping("/is/email/verify")
+	public Boolean isEmailVerified(@RequestHeader("Authorization") String authorizationHeader) {
+		String token = authorizationHeader.substring(7);
+		String email = jwt.getUserNameFromJwtToken(token);
+		User user = userRepository.findByEmail(email);
 
-        return user != null && user.getIsEmailVerified();
-    }
+		return user != null && user.getIsEmailVerified();
+	}
 
-    @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestParam("email") String email) throws MessagingException {
-        if (!userRepository.existsByEmail(email)) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error: Email not found!"));
-        }
+	@PostMapping("/forgot-password")
+	public ResponseEntity<?> forgotPassword(@RequestParam("email") String email) throws MessagingException {
+		if (!userRepository.existsByEmail(email)) {
+			return ResponseEntity.badRequest().body(new MessageResponse("Error: Email not found!"));
+		}
 
-         PasswordResetToken resetToken = new PasswordResetToken();
-        resetToken.setToken(UUID.randomUUID().toString());
-        resetToken.setEmail(email);
-        resetToken.setExpiryDate(LocalDateTime.now().plusMinutes(10));
-        tokenRepository.save(resetToken);
+		PasswordResetToken resetToken = new PasswordResetToken();
+		resetToken.setToken(UUID.randomUUID().toString());
+		resetToken.setEmail(email);
+		resetToken.setExpiryDate(LocalDateTime.now().plusMinutes(10));
+		tokenRepository.save(resetToken);
 
-        emailService.sendHtmlEmail(email, "Password Reset Request",
-                "You requested to reset your password. Use the following token to reset it: " + resetToken.getToken());
+		String subject = "Password Reset Request";
+		String body = "You requested to reset your password. Use the following token to reset it: "
+				+ "<a href=\"https://onefactor.in/r/reset/password/" + resetToken.getToken() + "\">Reset Password</a>";
 
-        return ResponseEntity.ok().body(new MessageResponse("Password reset token sent to your email"));
-    }
+		emailService.sendHtmlEmail(email, subject, body);
+
+		return ResponseEntity.ok().body(new MessageResponse("Password reset token sent to your email"));
+	}
 }
