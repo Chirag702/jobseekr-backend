@@ -243,6 +243,7 @@ public class AuthController {
 
 	    // Update the user's password (make sure to encode it)
 	    user.setPassword(encoder.encode(newPassword));
+	    System.out.println(newPassword);
 	    userRepository.save(user);
 
 	    // Invalidate the token after use
