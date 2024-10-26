@@ -251,4 +251,20 @@ public class AuthController {
 	    return ResponseEntity.ok(new MessageResponse("Password reset successfully."));
 	}
 
+	@PostMapping("/validate-token")
+	public ResponseEntity<?> validate(@RequestParam("token") String token) {
+	    // Retrieve the token
+	    PasswordResetToken resetToken = tokenRepository.findByToken(token);
+	    
+	    // Check if token exists and is valid
+	    if (resetToken == null) {
+	        return ResponseEntity.badRequest().body(new MessageResponse("Error: Invalid token!"));
+	    }
+	    if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+	        return ResponseEntity.badRequest().body(new MessageResponse("Error: Token expired!"));
+	    }
+
+	    return ResponseEntity.ok("token is valid");
+	}
+
 }
