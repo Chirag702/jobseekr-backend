@@ -217,10 +217,38 @@ public class AuthController {
 
 		String subject = "Password Reset Request";
 		String body = "You requested to reset your password. Use the following token to reset it: "
-				+ "<a href=\"https://onefactor.in/r/reset/password/" + resetToken.getToken() + "\">Reset Password</a>";
+				+ "<a href=\"https://onefactor.in/#/r/reset/password/" + resetToken.getToken() + "\">Reset Password</a>";
 
 		emailService.sendHtmlEmail(email, subject, body);
 
 		return ResponseEntity.ok().body(new MessageResponse("Password reset token sent to your email"));
 	}
+	
+	@PostMapping("/reset-password")
+	public ResponseEntity<?> resetPassword(@RequestParam("token") String token, 
+	                                       @RequestBody String newPassword) {
+	    // Retrieve the token
+	    PasswordResetToken resetToken = tokenRepository.findByToken(token);
+	    
+	    // Check if token exists and is valid
+	    if (resetToken == null) {
+	        return ResponseEntity.badRequest().body(new MessageResponse("Error: Invalid token!"));
+	    }
+	    if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+	        return ResponseEntity.badRequest().body(new MessageResponse("Error: Token expired!"));
+	    }
+
+	    // Find the user by email associated with the token
+	    User user = userRepository.findByEmail(resetToken.getEmail());
+
+	    // Update the user's password (make sure to encode it)
+	    user.setPassword(encoder.encode(newPassword));
+	    userRepository.save(user);
+
+	    // Invalidate the token after use
+	    tokenRepository.delete(resetToken);
+
+	    return ResponseEntity.ok(new MessageResponse("Password reset successfully."));
+	}
+
 }
